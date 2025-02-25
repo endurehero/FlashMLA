@@ -135,6 +135,11 @@ struct Flash_fwd_kernel_traits_mla {
             Copy_Atom<AutoVectorizingCopyWithAssumedAlignment<128>, ElementAccum>{},
             GmemLayoutAtomOaccum{},
             Layout<Shape<_1, Int<kGmemElemsPerLoadAccum>>>{}));  // Val layout, 4 vals per store
+
+
+
+    // for fp8 trans-v
+    
 };
 
 namespace flash {
@@ -170,7 +175,7 @@ __forceinline__ __device__ void store(const Flash_fwd_mla_params &params, const 
     constexpr int kBlockM = Kernel_traits::kBlockM;
     constexpr int kHeadDimV = Kernel_traits::kHeadDimV;
     constexpr int kNThreadsS = Kernel_traits::kNThreadsS;
-    using Element = typename Kernel_traits::Element;
+    using Element = typename Kernel_traits::ElementO;
     using ElementAccum = typename Kernel_traits::ElementAccum;
     using index_t = typename Kernel_traits::index_t;
 
@@ -272,7 +277,9 @@ __forceinline__ __device__ void compute_attn_1rowblock_splitkv_mla(const Flash_f
     Tensor sQ = make_tensor(make_smem_ptr(shared_storage.smem_q.data()), typename Kernel_traits::SmemLayoutQ{});
     Tensor sK = make_tensor(make_smem_ptr(shared_storage.smem_k.data()), typename Kernel_traits::SmemLayoutK{});
     Tensor sV = make_tensor(make_smem_ptr(shared_storage.smem_k.data()), typename Kernel_traits::SmemLayoutV{});
-    Tensor sVt = make_tensor(make_smem_ptr(shared_storage.smem_k.data()), typename Kernel_traits::SmemLayoutVtransposed{});
+    auto sVt = cute::conditional_return<Kernel_traits::Is_FP8>(
+                    make_tensor(make_smem_ptr(shared_storage.smem_k.data()), typename Kernel_traits::SmemLayoutVtMMa{}),
+                    make_tensor(make_smem_ptr(shared_storage.smem_vt.data()), typename Kernel_traits::SmemLayoutVtransposed{}));
 
     Tensor sP = make_tensor(make_smem_ptr(shared_storage.smem_p.data()), typename Kernel_traits::SmemLayoutP{});
     Tensor tPsP = sP(_, tidx % kNThreadsS, _, _);
