@@ -63,5 +63,6 @@ def flash_mla_with_kvcache(
         causal,
         tile_scheduler_metadata,
         num_splits,
+        None, None, None,
     )
     return out, softmax_lse
