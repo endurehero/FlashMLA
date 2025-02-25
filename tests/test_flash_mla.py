@@ -37,7 +37,7 @@ def cal_diff(x: torch.Tensor, y: torch.Tensor, name: str) -> None:
 
 
 @torch.inference_mode()
-def test_flash_mla(b, s_q, mean_sk, h_q, h_kv, d, dv, causal, varlen):
+def test_flash_mla(b, s_q, mean_sk, h_q, h_kv, d, dv, causal, varlen, use_fp8 = False):
     print(f"{b=}, {s_q=}, {mean_sk=}, {h_q=}, {h_kv=}, {d=}, {dv=}, {causal=}, {varlen=}")
 
     cache_seqlens = torch.full((b,), mean_sk, dtype=torch.int32)
@@ -59,11 +59,28 @@ def test_flash_mla(b, s_q, mean_sk, h_q, h_kv, d, dv, causal, varlen):
     blocked_v = blocked_k[..., :dv]
 
     tile_scheduler_metadata, num_splits = get_mla_metadata(cache_seqlens, s_q * h_q // h_kv, h_kv)
+    
+
+    descale_q, descale_k = None, None
+    if use_fp8:
+        fp8_dtype = torch.float8_e4m3fn
+        descale_q = torch.ones((b), dtype=torch.float32)
+        descale_k = torch.ones((b), dtype=torch.float32)
+        
+        q_fp8 = q.to(fp8_dtype)
+        blocked_k_fp8 = blocked_k.to(fp8_dtype)
+        blocked_v_fp8 = blocked_v.to(fp8_dtype)
+        q = q_fp8.to(q.dtype)
+        blocked_k = blocked_k_fp8.to(blocked_k.dtype)
+        blocked_v = blocked_v_fp8.to(blocked_v.dtype)
 
     def flash_mla():
+        q_ = q_fp8 if use_fp8 else q
+        blocked_k_ = blocked_k_fp8 if use_fp8 else blocked_k
         return flash_mla_with_kvcache(
-            q, blocked_k, block_table, cache_seqlens, dv,
+            q_, blocked_k_, block_table, cache_seqlens, dv,
             tile_scheduler_metadata, num_splits, causal=causal,
+            descale_q=descale_q, descale_k=descale_k,
         )
 
     def ref_mla():
@@ -107,10 +124,11 @@ if __name__ == "__main__":
     h_kv = 1
     d, dv = 576, 512
     causal = True
+    use_fp8 = False
 
     for b in [128]:
         for s in [4096, 8192]:
             for h_q in [16, 32, 64, 128]:  # TP = 8, 4, 2, 1
                 for s_q in [1, 2]:  # MTP = 1, 2
                     for varlen in [False, True]:
-                        test_flash_mla(b, s_q, s, h_q, h_kv, d, dv, causal, varlen)
+                        test_flash_mla(b, s_q, s, h_q, h_kv, d, dv, causal, varlen, use_fp8)

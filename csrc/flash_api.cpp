@@ -70,8 +70,7 @@ mha_fwd_kvcache_mla(
     const at::Tensor &tile_scheduler_metadata,   // num_sm_parts x TileSchedulerMetaDataSize
     const at::Tensor &num_splits,                 // batch_size + 1
     c10::optional<const at::Tensor> &descale_q,  // batch_size
-    c10::optional<const at::Tensor> &descale_k,  // batch_size
-    c10::optional<const at::Tensor> &descale_v  // batch_size
+    c10::optional<const at::Tensor> &descale_k  // batch_size
 ) {
     auto dprops = at::cuda::getCurrentDeviceProperties();
     bool is_sm90 = dprops->major == 9 && dprops->minor == 0;
