@@ -260,7 +260,7 @@ __forceinline__ __device__ void compute_attn_1rowblock_splitkv_mla(const Flash_f
                                                                    const int bidb, const int bidh, const int m_block,
                                                                    const int n_split_idx, const int seqlen_k,
                                                                    const int n_block_min, const int n_block_max, const bool NoSplit,
-                                                                   SharedStorage &shared_storage) {
+                                                                   SharedStorage &shared_storage, const float descale_q, const float descale_k) {
     constexpr int kBlockM = Kernel_traits::kBlockM;
     constexpr int kBlockN = Kernel_traits::kBlockN;
     constexpr int kHeadDim = Kernel_traits::kHeadDim;
@@ -494,6 +494,12 @@ flash_fwd_splitkv_mla_kernel(__grid_constant__ const Flash_fwd_mla_params params
     if (begin_idx >= params.b) return;
     int begin_n_split_idx = __ldg(tile_scheduler_metadata_ptr + 4);
 
+    float descale_q, descale_k;
+    if constexpr (Kernel_traits::Is_FP8) {
+        descale_q = __ldg(params.descale_q_ptr);
+        descale_k = __ldg(params.descale_k_ptr);
+    }
+
 #pragma unroll 1
     for (int batch_id = begin_idx; batch_id <= end_idx; ++batch_id) {
         const int n_split_idx = batch_id == begin_idx ? begin_n_split_idx : 0;
@@ -504,7 +510,7 @@ flash_fwd_splitkv_mla_kernel(__grid_constant__ const Flash_fwd_mla_params params
         if (batch_id > begin_idx) {
             __syncthreads();  // Barrier between two tiles.
         }
-        flash::compute_attn_1rowblock_splitkv_mla<Kernel_traits, Is_causal>(params, batch_id, bidh, m_block, n_split_idx, seqlen_k, n_block_min, n_block_max, NoSplit, shared_storage);
+        flash::compute_attn_1rowblock_splitkv_mla<Kernel_traits, Is_causal>(params, batch_id, bidh, m_block, n_split_idx, seqlen_k, n_block_min, n_block_max, NoSplit, shared_storage, descale_q, descale_k);
     }
 }
 
