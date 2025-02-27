@@ -235,4 +235,24 @@ __forceinline__ __device__ void copy(TiledCopy tiled_copy, Tensor<Engine0, Layou
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+template <typename Fragment>
+CUTLASS_DEVICE void permute_Cregs_fp8(Fragment &frag) {
+    // frag has shape ((2, 2, N / 8), MMA_M, MMA_N), each element is 32 bits
+    static_assert(decltype(size<0, 0>(frag))::value == 2);
+    static_assert(decltype(size<0, 1>(frag))::value == 2);
+    static_assert(decltype(size<0, 2>(frag))::value % 2 == 0);
+    static_assert(decltype(stride<0, 0>(frag))::value == 1);
+    static_assert(sizeof(typename Fragment::value_type) == 4);
+    Tensor frag_64b = group_modes<1, 3>(recast<uint2>(frag));  // ((1, 2, N / 8), (MMA_M, MMA_N))
+    #pragma unroll
+    for (int mi = 0; mi < size<1>(frag_64b); ++mi) {
+        #pragma unroll
+        for (int i = 0; i < size<0, 2>(frag_64b) / 2; ++i) {
+            cutlass::swap(frag_64b(make_coord(_0{}, _1{}, 2 * i), mi), frag_64b(make_coord(_0{}, _0{}, 2 * i + 1), mi));
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 }  // namespace flash
