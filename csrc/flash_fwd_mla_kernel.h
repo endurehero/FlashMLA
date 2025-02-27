@@ -86,19 +86,10 @@ struct Flash_fwd_kernel_traits_mla {
             getSmemLayoutK<Element, kHeadDim, kHeadDimV>(),
             Shape<Int<kBlockN>, Int<kHeadDim>>{}));
 
-    // ------ for f16 ------
     using SmemLayoutV = decltype(tile_to_shape(
             getSmemLayoutK<Element, kHeadDim, kHeadDimV>(),
             Shape<Int<kBlockN>, Int<kHeadDimV>>{}));
-    using SmemLayoutVtransposed = decltype(composition(SmemLayoutV{}, make_layout(Shape<Int<kHeadDimV>, Int<kBlockN>>{}, GenRowMajor{})));
-
-    // ------ for f8 ------
-    using SmemLayoutVtLoad = decltype(tile_to_shape(
-            getSmemLayoutK<Element, kHeadDim, kHeadDimV, GMMA::Major::MN>(),
-            Shape<Int<kHeadDimV>, Int<kBlockN>>{}));
-    using SmemLayoutVtMMa = decltype(tile_to_shape(
-        getSmemLayoutK<Element, kHeadDim, kHeadDimV>(),
-        Shape<Int<kHeadDimV>, Int<kBlockN> >{}));
+    using SmemLayoutVtransposed = decltype(composition(SmemLayoutV{}, make_layout(Shape<Int<kHeadDimV>, Int<kBlockN>>{}, GenRowMajor{})));    
 
     using SmemLayoutP = std::conditional_t<
         Is_FP8,
@@ -155,6 +146,39 @@ struct Flash_fwd_kernel_traits_mla {
             Copy_Atom<AutoVectorizingCopyWithAssumedAlignment<128>, ElementAccum>{},
             GmemLayoutAtomOaccum{},
             Layout<Shape<_1, Int<kGmemElemsPerLoadAccum>>>{}));  // Val layout, 4 vals per store
+
+
+    // ----------- For fp8 transpose v -----------
+    static_assert(kBlockN % 64 == 0 && kHeadDimV % 64 == 0);
+    using TransposeShapeAtomV = Shape<_64, _64>;
+    using SmemLayoutV = decltype(composition(
+        SmemLayoutK{},
+        Layout<Shape<Int<kBlockN, Int<kHeadDimV>>, Stride<Int<1>, Int<kBlockN>>>>{}));
+
+    // for fp8 in-kernel transpose -- src layout
+    using SmemLayoutDivideV = decltype(tiled_divide(SmemLayoutV{}, TransposeShapeAtomV{}));
+    using SmemShapeLDSM = Shape<Shape<_8, _8>, Shape<_16, _4>>;
+    using FactoringShapeV = decltype(make_shape(SmemShapeLDSM{}, shape<1>(SmemLayoutDivideV{}),
+                                              shape<2>(SmemLayoutDivideV{}), shape<3>(SmemLayoutDivideV{})));
+    using SmemLayoutTransposeV = decltype(composition(SmemLayoutDivideV{}, make_layout(FactoringShapeV{})));
+    
+    // For fp8, this is the memory transpose.
+    using SmemLayoutAtomVt = decltype(tile_to_shape(GMMA::Layout_K_SW64_Atom<Element>{}, TransposeShapeAtomV{}));
+    using SmemLayoutVt =
+        decltype(tile_to_shape(SmemLayoutAtomVt{},
+                 make_shape(Int<kHeadDimV>, Int<kBlockN>)));
+
+    // for fp8 in-kernel transpose -- dst layout
+    using SmemLayoutVtTrans =
+        decltype(composition(SmemLayoutVt{},
+                             make_ordered_layout(product_each(shape(SmemLayoutV{})), Step<_2, _1, _3>{})));
+    using SmemLayoutDivideVt = decltype(tiled_divide(SmemLayoutVtTrans{}, TransposeShapeAtomV{}));
+
+    using SmemShapeSTSM = Shape<Shape<_16, _4>, Shape<_8, _8>>;
+    using FactoringShapeVt = decltype(make_shape(SmemShapeSTSM{},
+        shape<1>(SmemLayoutDivideVt{}), shape<2>(SmemLayoutDivideVt{}), shape<3>(SmemLayoutDivideVt{})));
+    using SmemLayoutTransposeVt = decltype(composition(SmemLayoutDivideVt{}, make_layout(FactoringShapeVt{})));
+    // ----------- fp8 end -----------
 };
 
 namespace flash {
