@@ -395,7 +395,6 @@ __forceinline__ __device__ void compute_attn_1rowblock_splitkv_mla(const Flash_f
         cute::copy(softmax.row_sum, tRow_sumsRow_sum);
         cutlass::arch::NamedBarrier::arrive(kNThreads, static_cast<int>(NamedBarriers::SoftmaxReady));
     } else {
-        const int warp_group_thread_idx = threadIdx.x % cutlass::NumThreadsPerWarpGroup;
         const int *block_table = params.block_table + bidb * params.block_table_batch_stride;
         int cur_block_table = __ldg(&block_table[n_block]);
 
