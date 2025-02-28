@@ -1,13 +1,10 @@
 #pragma once
 
-template <int kBlockN, int kHeadDim, typename Element>
+template <int kBlockN, int kHeadDim, typename SmemLayoutK>
 struct SmemTransposeFp8_64x64 {
-    static_assert(sizeof(Element) == 1);
     static_assert((kBlockN % 64 == 0) && (kHeadDim % 64 == 0));
 
-    using SmemLayoutK = decltype(tile_to_shape(
-            GMMA::Layout_K_SW64_Atom<Element>{},
-            Shape<Int<kBlockN>, Int<kHeadDim>>{}));
+    using Element = cutlass::float_e4m3_t;
     using SmemLayoutV = decltype(composition(
             SmemLayoutK{},
             Layout<Shape<Int<kBlockN>, Int<kHeadDim>>, Stride<_1, Int<kBlockN>>>{}));
