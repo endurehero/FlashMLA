@@ -1,12 +1,4 @@
-#include <cutlass/cutlass.h>
-#include <cutlass/array.h>
-#include <cutlass/numeric_types.h>
-
-using namespace cute;
-
-#include "flash_mla.h"
-#include "static_switch.h"
-#include "utils.h"
+#include "flash_fwd_mla_kernel.h"
 
 static constexpr int MaxBatchSize = 4096;
 
