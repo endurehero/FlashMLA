@@ -328,8 +328,13 @@ __forceinline__ __device__ void compute_attn_1rowblock_splitkv_mla(const Flash_f
         if (n_block % 2 == 1) {
             // Double buffer for sK
             constexpr int sK_offset = size(sK);
-            tSrK.data() = tSrK.data() + sK_offset / 8;
-            if constexpr (!Kernel_traits::Is_FP8) tOrVt.data() = tOrVt.data() + sK_offset / 8;
+            
+            if constexpr (Kernel_traits::Is_FP8) {
+                tSrK.data() = tSrK.data() + sK_offset / 16;
+            } else {
+                tSrK.data() = tSrK.data() + sK_offset / 8;
+                tOrVt.data() = tOrVt.data() + sK_offset / 8;
+            }
         }
 
         // We need masking on S for the very last block when K and V has length not multiple of kBlockN.
@@ -392,8 +397,12 @@ __forceinline__ __device__ void compute_attn_1rowblock_splitkv_mla(const Flash_f
 
             // Double buffer for sK
             const int sK_offset = n_block % 2 == 0 ? size(sK) : -size(sK);
-            tSrK.data() = tSrK.data() + sK_offset / 8;
-            if constexpr (!Kernel_traits::Is_FP8) tOrVt.data() = tOrVt.data() + sK_offset / 8;
+            if constexpr (Kernel_traits::Is_FP8) {
+                tSrK.data() = tSrK.data() + sK_offset / 16;
+            } else {
+                tSrK.data() = tSrK.data() + sK_offset / 8;
+                tOrVt.data() = tOrVt.data() + sK_offset / 8;
+            }
         }
 
         cute::copy(softmax.row_max, tRow_maxsRow_max);
@@ -513,9 +522,9 @@ __forceinline__ __device__ void compute_attn_1rowblock_splitkv_mla(const Flash_f
             if constexpr (Kernel_traits::Is_FP8) __syncthreads();
             flash::gemm</*zero_init=*/false, /*wg_wait=*/0>(tiled_mma_o, tOrP, tOrVt, tOrO);
 
-            // Double buffer for sK
-            const int sK_offset = n_block % 2 == 0 ? size(sK) : -size(sK);
             if constexpr (!Kernel_traits::Is_FP8) {
+                // Double buffer for sK
+                const int sK_offset = n_block % 2 == 0 ? size(sK) : -size(sK);
                 tOrVt.data() = tOrVt.data() + sK_offset / 8;
             }
         }
