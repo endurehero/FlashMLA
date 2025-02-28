@@ -33,7 +33,7 @@ def cal_diff(x: torch.Tensor, y: torch.Tensor, name: str) -> None:
     cos_diff = 1 - 2 * (x * y).sum().item() / max((x * x + y * y).sum().item(), 1e-12)
     amax_diff = (x - y).abs().max().item()
     # print(f"{name}: {cos_diff=}, {RMSE=}, {amax_diff=}")
-    #assert cos_diff < 1e-5
+    assert cos_diff < 1e-5
 
 
 @torch.inference_mode()
