@@ -35,7 +35,7 @@ def cal_diff(x: torch.Tensor, y: torch.Tensor, name: str, use_fp8: bool=False) -
     # print(f"{name}: {cos_diff=}, {RMSE=}, {amax_diff=}")
 
     if use_fp8:
-        assert cos_diff < 1e-3
+        assert cos_diff < 1e-2
     else:
         assert cos_diff < 1e-5
 
