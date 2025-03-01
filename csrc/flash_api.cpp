@@ -218,9 +218,12 @@ mha_fwd_kvcache_mla(
         run_mha_fwd_splitkv_mla<cutlass::half_t, cutlass::half_t, 576>(params, stream);
     }
     #endif
+    #ifndef FLASH_MLA_DISABLE_FP8
     else if (q_dtype == torch::kFloat8_e4m3fn) {
         run_mha_fwd_splitkv_mla<cutlass::float_e4m3_t, cutlass::bfloat16_t, 576>(params, stream);
-    } else {
+    }
+    #endif
+    else {
         TORCH_CHECK(false, "Unsupported tensor dtype for query");
     }
 
