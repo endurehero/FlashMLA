@@ -23,6 +23,7 @@ def get_sources():
     sources = [
         "csrc/flash_api.cpp",
         "csrc/flash_fwd_mla_bf16_sm90.cu",
+        "csrc/flash_fwd_mla_bf16_hdim560_sm90.cu",
         "csrc/flash_fwd_mla_metadata.cu",
     ]
 

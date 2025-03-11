@@ -42,12 +42,12 @@ struct Flash_fwd_kernel_traits_mla {
     static constexpr int kBlockM = kBlockM_;
     static constexpr int kBlockN = kBlockN_;
     static constexpr int kHeadDim = kHeadDim_;
-    static_assert(kHeadDim % 32 == 0);
+    static_assert(kHeadDim % 16 == 0);
     static constexpr int kHeadDimV = kHeadDimV_ != 0 ? kHeadDimV_ : kHeadDim;
     static_assert(kHeadDimV % 32 == 0);
     static_assert(kHeadDimV <= kHeadDim);
-    static constexpr int kBlockKSmem = kHeadDim % 64 == 0 ? 64 : 32;
-    static constexpr int kSwizzle = kBlockKSmem == 32 ? 2 : 3;
+    static constexpr int kBlockKSmem = kHeadDim % 64 == 0 ? 64 : (kHeadDim % 32 == 0 ? 32 : 16);
+    static constexpr int kSwizzle = kBlockKSmem == 32 ? 2 : (kBlockKSmem == 16 ? 1 : 3);
 
     using TiledMma = decltype(make_tiled_mma(
             cute::GMMA::ss_op_selector<Element, Element, ElementAccum, Shape<Int<kBlockM>, Int<kBlockN>, Int<kHeadDim>>,
@@ -595,9 +595,9 @@ void run_flash_splitkv_fwd_mla(Flash_fwd_mla_params &params, cudaStream_t stream
 
 template<typename T, int Headdim>
 void run_mha_fwd_splitkv_mla(Flash_fwd_mla_params &params, cudaStream_t stream) {
-    static_assert(Headdim == 576);
+    static_assert(Headdim == 576 || Headdim == 560);
     FLASH_ASSERT(params.d_v == 512);
     FLASH_ASSERT(params.k_ptr == params.v_ptr);  // Shared_KV
-    using Kernel_traits = Flash_fwd_kernel_traits_mla<576, 64, 64, 8, T, 512>;
+    using Kernel_traits = Flash_fwd_kernel_traits_mla<Headdim, 64, 64, 8, T, 512>;
     run_flash_splitkv_fwd_mla<Kernel_traits, flash::SharedStorageMLA<Kernel_traits>>(params, stream);
 }
