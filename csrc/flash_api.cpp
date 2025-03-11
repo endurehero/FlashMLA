@@ -184,13 +184,18 @@ mha_fwd_kvcache_mla(
     params.oaccum_ptr = out_accum.data_ptr();
 
     auto stream = at::cuda::getCurrentCUDAStream().stream();
-    TORCH_CHECK(head_size == 576 || head_size == 560);
+    TORCH_CHECK(head_size == 576 || head_size == 560 || head_size == 416);
+    if (head_size == 416) {
+        TORCH_CHECK(head_size_v == 384);
+    }
 
     if (q_dtype == torch::kBFloat16) {
         if (head_size == 576) {
             run_mha_fwd_splitkv_mla<cutlass::bfloat16_t, 576>(params, stream);
         } else if (head_size == 560) {
             run_mha_fwd_splitkv_mla<cutlass::bfloat16_t, 560>(params, stream);
+        } else if (head_size == 416) {
+            run_mha_fwd_splitkv_mla<cutlass::bfloat16_t, 416>(params, stream);
         }
     }
     #ifndef FLASH_MLA_DISABLE_FP16
